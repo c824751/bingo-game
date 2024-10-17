@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bingo Game</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+    <style>
+        /* Bingo board styles */
+        .bingo-board {
+            display: grid;
+            grid-template-columns: repeat(5, 0fr);
+            gap: 1px; /* 調整間距為1px，減少空白 */
+        }
+        .cell {
+            width: 40px; /* 調整寬度 */
+            height: 40px; /* 調整高度 */
+            border: 1px solid #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .marked {
+            border: 2px solid red;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="bingo-board">
+            <div v-for="(number, index) in board" :key="index" :class="['cell', { marked: markedNumbers.includes(number) }]">
+                {{ number }}
+            </div>
+        </div>
+        <button @click="play" :disabled="isGameWon">Play</button>
+
+        <!-- 顯示目前剩餘球數 -->
+        <div>
+            <h3>目前剩餘球數: {{ currentCount }}</h3>
+        </div>
+
+        <!-- 新增顯示已抽過的球 -->
+        <div>
+            <h3>已抽過的球:</h3>
+            <div v-for="(number, index) in drawnNumbers" :key="index">
+                {{ number }}
+            </div>
+        </div>
+    </div>
+
+    <script>
+        new Vue({
+            el: '#app',
+            data: {
+                board: [],
+                markedNumbers: [],
+                drawnNumbers: [],
+                currentCount: 50, // 預設球數
+                isGameWon: false, // 新增變數以追蹤遊戲是否獲勝
+            },
+            created() {
+                this.fetchBoard();
+            },
+            methods: {
+                fetchBoard() {
+                    fetch('core.php')
+                        .then(response => response.json())
+                        .then(data => {
+                            console.log(data);
+                            this.board = data.board;
+                            this.drawnNumbers = []; // 獲取新板時清空已抽取的球
+                        });
+                },
+                play() {
+                    if (this.currentCount <= 0) {
+                        alert("已經抽完所有球，請重新開始遊戲！");
+                        return;
+                    }
+                    fetch('core.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ drawnNumbers: this.drawnNumbers, ballCount: this.currentCount }) // 傳遞目前球數
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) {
+                            alert(data.error);
+                            return;
+                        }
+                        this.drawnNumbers = data.drawnNumbers;
+                        this.currentCount = data.currentCount; // 更新目前球數
+                        this.markedNumbers.push(data.newBall);
+                        this.checkWin();
+                    });
+                },
+                checkWin() {
+                    const winningCombinations = [
+                        // 橫向
+                        [0, 1, 2, 3, 4],
+                        [5, 6, 7, 8, 9],
+                        [10, 11, 12, 13, 14],
+                        [15, 16, 17, 18, 19],
+                        [20, 21, 22, 23, 24],
+                        // 縱向
+                        [0, 5, 10, 15, 20],
+                        [1, 6, 11, 16, 21],
+                        [2, 7, 12, 17, 22],
+                        [3, 8, 13, 18, 23],
+                        [4, 9, 14, 19, 24],
+                        // 對角線
+                        [0, 6, 12, 18, 24],
+                        [4, 8, 12, 16, 20],
+                    ];
+
+                    for (const combination of winningCombinations) {
+                        if (combination.every(index => this.markedNumbers.includes(this.board[index]))) {
+                            this.isGameWon = true; // 設置為獲勝狀態
+                            // 重置遊戲並隱藏play按鈕
+                            // this.resetGame();
+                            // return;
+                        }
+                    }
+                },
+                resetGame() {
+                    this.markedNumbers = [];
+                    this.drawnNumbers = [];
+                    this.fetchBoard();
+                }
+            }
+        });
+    </script>
+</body>
+</html>
